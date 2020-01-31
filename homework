@@ -1,0 +1,35 @@
+一、简单题
+1、Mybatis动态sql是做什么的？都有哪些动态sql？简述一下动态sql的执行原理？
+动态SQL是Mybatis提供的一系列标签服务于处理不同的条件而需要拼接不同的SQL,完成不同的情形下的业务条件下的SQL应用。
+常用的动态SQL包含如下几种：
+If
+Choose(when , otherwise)
+Trim(where,set)
+Foreach
+动态SQL的执行原理：
+SqlNode接口从xml文件或者注解映射中的sql内容，创建BoundSql,BoundSql封装Mybatis最终产生的sql的类，包括sql语句，参数，参数源数据等参数。
+2、Mybatis是否支持延迟加载？如果支持，它的实现原理是什么？
+支持延迟加载，mybatis仅支持association关联对象和collection关联集合对象的延迟加载。Association指的是一对一，colleciton指的是一对多的查询。
+原理：它使用cglib来创建目标对象的代理对象，当调用目标方法时，进入拦截器方法，比如调用t.getUser().getName(),拦截器invoke()方法发现t.getUser()是Null值，那么就会单独发送事先保存好的查询关联User对象的sql, 把User查询出来，然后调用u.setUser(user),于是t的对象user属性就有值了，接着完成t.getUser().getName()方法的调用，这就是延迟加载的基本原理。
+3、Mybatis都有哪些Executor执行器？它们之间的区别是什么？
+Executor执行器分类：
+BaseExecutor : 是一个抽象类，采用模板方法的设计模式
+SimpleExecutor：MyBatis默认使用的executor。最简单的执行器，根据对应的SQL直接执行即可，不会做一些额外的操作；拼接完sql以后，直接交给StatementHandler去执行。
+ReuseExecutor：可重用的执行器，重用的对象是Statement，也就是说该执行器会缓存同一个sql的statement，省去statement的重建工作。优化性能。内部的实现是通过一个HashMap来维护statement对象的，由于当前Map只在该session中有效，所以使用完成后需要调用flushstatement来清除map.
+BatchExecutor： 通过批量操作来优化操作。通常需要注意的是批量更新操作。由于内部有缓存的实现，使用完成后需要调用flushStatments来清理缓存
+CachingExecutor：启用二级缓存时的执行器。采用静态代理，代理一个Executor对象。执行update方法前判断是否清空二级缓存。执行query方法前先在二级缓存中查询，命中失败再通过被代理类查询。
+
+4、简述下Mybatis的一级、二级缓存（分别从存储结构、范围、失效场景。三个方面来作答）？
+一组缓存是SqlSession级别的缓存，在操作数据库里需要构造sqlSession对象，在对象中有一个数据结构（HashMap）用于存储缓存数据，不同的sqlSession之间的缓存 数据区域（HashMap）是互相不影响的。
+二级缓存是mapper级别的缓存，多个sqlSession去操作同一个Mapper的sql语句，多个sqlSession可以共用二级缓存 、二级缓存是跨sqlSession的。
+5、简述Mybatis的插件运行原理，以及如何编写一个插件？
+Mybatis针对四大组件（Executor,Statementhandler,ParameterHandler,ResultSetHandler）处提供简单易用的插件扩展机制。对Mybatis来说，插件就是拦截器，用来增强核心对象的功能。增加功能本质上是通过借助于底层的动态代理来实现的。
+插件运行原理：
+在四大对象创建的时候
+1.	每个创建出来的对象不是直接返回的，而是interceptorChain.pluginAll(parameterHandler)；
+2.	获取到所有的Interceptor；调用interceptor.plugin(target)返回target包装后的对象
+3.	插件机制，我们可以使用插件为目标对象创建一个代理对象；aop我们的插件可以为四大对象创建出代理对象，代理对象就可以拦截到四大对象的每一个执行。
+我们可以在Mybatis启动时加载插件，并保存插件实例到相关对象(InterceptorChain，拦截器链)中。待准备工作做完后，mybatis处于就绪状态。我们在执行sql时，需要先通过DefaultSqlSessionFactory创建SqlSession，Executor实例会创建SqlSession的过程中被创建，Executor实例创建完成后，mybatis会通过jdk动态代理为实例类生成代理类，这样，插件逻辑即可在executor相关方法被调用前执行。
+如何实现自定义插件：
+1.	实现Interceptor插件接口
+2.	重写Interceptor中的interceptor方法（插件核心方法）、plugin方法（生成target的代理对象）、setProperties方法（传递插件所需参数）
